@@ -145,6 +145,7 @@ a {
 /* ---------- layout ---------- */
 
 .page {
+  isolation: isolate; /* keeps the doodles (z-index -1) above the paper but under the content */
   width: 100%;
   max-width: 560px;
   margin: 0 auto;
@@ -774,12 +775,49 @@ textarea.input {
 }
 
 .streak {
-  display: inline-block;
-  padding: 2px 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 10px 2px 6px;
+  border: 2px solid var(--graphite);
   border-radius: 999px;
-  background: var(--opt-0);
+  background: var(--white);
   font-size: 13px;
   font-weight: 700;
+  white-space: nowrap;
+}
+.streak[data-level="2"] {
+  background: var(--opt-0);
+}
+.streak[data-level="3"] {
+  background: var(--opt-1);
+}
+.streak[data-big] {
+  font-size: 17px;
+  padding: 6px 16px 6px 10px;
+  white-space: normal;
+  animation: pop 320ms 450ms cubic-bezier(0.2, 1.5, 0.4, 1) both;
+}
+.flame {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  fill: #ff5a1f;
+  stroke: var(--graphite);
+  stroke-width: 1.4;
+  stroke-linejoin: round;
+  transform-origin: 50% 90%;
+}
+.flame-core {
+  fill: var(--opt-0);
+  stroke: none;
+}
+.streak[data-big] .flame {
+  width: 26px;
+  height: 26px;
+}
+.streak:not([data-level="1"]) .flame {
+  animation: flicker 420ms ease-in-out infinite alternate;
 }
 
 /* ---------- host ---------- */
@@ -917,7 +955,22 @@ textarea.input {
   background: var(--white);
   font-weight: 700;
   font-size: clamp(16px, 2vw, 20px);
-  animation: pop 220ms var(--press);
+  animation: chip-in 420ms cubic-bezier(0.2, 1.5, 0.4, 1);
+}
+.chip[data-tint="0"] {
+  background: var(--opt-0);
+}
+.chip[data-tint="1"] {
+  background: var(--opt-1);
+}
+.chip[data-tint="2"] {
+  background: var(--opt-2);
+}
+.chip[data-tint="3"] {
+  background: var(--opt-3);
+}
+.chip[data-online="false"][data-tint] {
+  background: var(--white);
 }
 .chip[data-online="false"] {
   border-style: dashed;
@@ -1002,6 +1055,7 @@ textarea.input {
 .reveal .opt-tile[data-result="correct"] {
   border-color: var(--good);
   box-shadow: 0 0 0 3px var(--good);
+  animation: wiggle 600ms 150ms ease-in-out both;
 }
 .reveal .opt-tile[data-result="correct"] .opt-letter {
   background: var(--good);
@@ -1121,6 +1175,17 @@ textarea.input {
 .podium-step[data-place="1"] {
   animation-delay: 1600ms;
 }
+.crown {
+  width: clamp(40px, 6vw, 64px);
+  fill: var(--opt-0);
+  stroke: var(--graphite);
+  stroke-width: 2.5;
+  stroke-linejoin: round;
+  animation: bob 2s 2s ease-in-out infinite;
+}
+.crown circle {
+  fill: var(--opt-1);
+}
 .podium-name {
   font-weight: 700;
   font-size: clamp(16px, 2.4vw, 24px);
@@ -1209,6 +1274,7 @@ textarea.input {
   padding: 14px 0;
 }
 .player-name {
+  margin-right: auto;
   font-weight: 700;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1256,6 +1322,7 @@ textarea.input {
   padding: 0 0.2em;
   overflow-wrap: anywhere;
   background: linear-gradient(transparent 50%, var(--opt-0) 50%, var(--opt-0) 92%, transparent 92%);
+  animation: bob 2.6s ease-in-out infinite;
 }
 
 .answering {
@@ -1305,6 +1372,7 @@ textarea.input {
   cursor: default;
 }
 .answer[data-state="picked"] {
+  animation: picked 300ms var(--press);
   transform: translateY(3px);
   box-shadow:
     0 1px 0 var(--graphite),
@@ -1342,10 +1410,48 @@ textarea.input {
 .verdict[data-kind="correct"] {
   --tone: var(--good);
   background: var(--good-wash);
+  animation: pop 260ms var(--press);
 }
 .verdict[data-kind="wrong"] {
   --tone: var(--bad);
   background: var(--bad-wash);
+  animation: shake 480ms 260ms ease-in-out both;
+}
+.stamp-wrap {
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+.burst {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+}
+.burst i {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  margin: -9px;
+  background: var(--opt-0);
+  clip-path: polygon(50% 0, 62% 35%, 100% 38%, 70% 60%, 80% 100%, 50% 76%, 20% 100%, 30% 60%, 0 38%, 38% 35%);
+  animation: burst 750ms 120ms cubic-bezier(0.2, 0.8, 0.3, 1) both;
+}
+.burst i:nth-child(4n + 2) {
+  background: var(--opt-1);
+}
+.burst i:nth-child(4n + 3) {
+  background: var(--opt-2);
+}
+.burst i:nth-child(4n + 4) {
+  background: var(--ink);
+}
+.cheer {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(18px, 5vw, 22px);
+  line-height: 1.3;
+  text-wrap: balance;
+  animation: rise 300ms 200ms var(--press) both;
 }
 .verdict[data-kind="none"] {
   --tone: var(--muted);
@@ -1363,6 +1469,7 @@ textarea.input {
   animation: stamp 360ms cubic-bezier(0.2, 1.4, 0.4, 1) both;
 }
 .gain {
+  font-variant-numeric: tabular-nums;
   font-family: var(--font-display);
   font-weight: 800;
   font-size: 34px;
@@ -1397,6 +1504,37 @@ textarea.input {
   font-weight: 700;
   font-size: 20px;
 }
+.medal {
+  width: 92px;
+  height: 122px;
+  transform-origin: 50% 0;
+  animation:
+    medal-drop 650ms cubic-bezier(0.2, 1.4, 0.4, 1) both,
+    swing 3.2s 650ms ease-in-out infinite;
+}
+.medal-ribbon {
+  fill: var(--ink);
+  stroke: var(--graphite);
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+.medal-disc {
+  fill: var(--opt-0);
+  stroke: var(--graphite);
+  stroke-width: 2.5;
+}
+.medal[data-place="2"] .medal-disc {
+  fill: #d9dee8;
+}
+.medal[data-place="3"] .medal-disc {
+  fill: #f2a66b;
+}
+.medal text {
+  font-family: var(--font-display);
+  font-weight: 900;
+  font-size: 20px;
+  fill: var(--graphite);
+}
 .mini-podium {
   display: grid;
   gap: 6px;
@@ -1424,6 +1562,54 @@ textarea.input {
 .mini-podium strong {
   margin-left: auto;
   font-variant-numeric: tabular-nums;
+}
+
+/* ---------- decoration ---------- */
+
+.doodles {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+}
+.doodle {
+  position: absolute;
+  stroke: var(--ink);
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transform: rotate(var(--rot));
+  animation: drift 6s calc(var(--i) * -1.4s) ease-in-out infinite;
+}
+@media (max-width: 640px) {
+  .doodle {
+    scale: 0.7;
+    opacity: 0.6;
+  }
+  .doodle[data-hide-sm] {
+    display: none;
+  }
+}
+
+.confetti {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.sound-toggle {
+  flex: none;
+  border: 2px solid var(--graphite);
+  border-radius: 999px;
+  background: var(--white);
+}
+.sound-toggle[aria-pressed="false"] {
+  color: var(--muted);
+  border-style: dashed;
 }
 
 /* ---------- motion ---------- */
@@ -1473,6 +1659,77 @@ textarea.input {
 @keyframes pulse {
   50% {
     transform: scale(1.12);
+  }
+}
+
+@keyframes chip-in {
+  from {
+    transform: scale(0.4) rotate(-8deg);
+    opacity: 0;
+  }
+}
+@keyframes picked {
+  45% {
+    transform: translateY(3px) scale(1.04);
+  }
+}
+@keyframes shake {
+  20% {
+    transform: translateX(-10px) rotate(-1deg);
+  }
+  40% {
+    transform: translateX(9px) rotate(1deg);
+  }
+  60% {
+    transform: translateX(-6px);
+  }
+  80% {
+    transform: translateX(4px);
+  }
+}
+@keyframes wiggle {
+  25% {
+    transform: rotate(-1.5deg) scale(1.03);
+  }
+  50% {
+    transform: rotate(1.5deg) scale(1.03);
+  }
+  75% {
+    transform: rotate(-0.8deg);
+  }
+}
+@keyframes burst {
+  from {
+    transform: rotate(var(--a)) translateY(0) scale(0.2);
+    opacity: 1;
+  }
+  70% {
+    opacity: 1;
+  }
+  to {
+    transform: rotate(var(--a)) translateY(-104px) scale(1) rotate(90deg);
+    opacity: 0;
+  }
+}
+@keyframes flicker {
+  to {
+    transform: scale(1.12, 0.92) rotate(4deg);
+  }
+}
+@keyframes drift {
+  50% {
+    transform: translateY(-8px) rotate(calc(var(--rot) + 6deg));
+  }
+}
+@keyframes medal-drop {
+  from {
+    transform: translateY(-60px) rotate(-20deg);
+    opacity: 0;
+  }
+}
+@keyframes swing {
+  50% {
+    transform: rotate(5deg);
   }
 }
 

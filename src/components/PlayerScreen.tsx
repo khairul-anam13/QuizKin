@@ -4,10 +4,22 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { api, type Seat, seatKeyFor, store, useRoomStream, useSecondsLeft, vibrate } from "@/lib/client";
 import { LIMITS, OPTION_LETTERS } from "@/lib/quiz";
+import { confetti } from "@/lib/confetti";
+import { sfx } from "@/lib/sound";
 import type { PlayerView } from "@/lib/types";
-import { Connecting, Letter, Movement, Notice, Offline, TimerBar } from "./GameParts";
+import { Doodles } from "./Doodles";
+import { Connecting, Letter, Movement, Notice, Offline, SoundToggle, Streak, TimerBar, useCountUp } from "./GameParts";
+import { Medal } from "./Icons";
 
 const NAME_KEY = "qk:name";
+
+// Picked by question number so the line stays put when the view re-renders.
+const CHEERS = ["Hebat!", "Pintar sekali!", "Keren!", "Mantap!", "Luar biasa!"];
+const COMFORT = [
+  "Tidak apa-apa, ayo coba lagi di soal berikutnya!",
+  "Hampir! Semangat terus, ya.",
+  "Salah itu bagian dari belajar. Lanjut!",
+];
 
 export function PlayerScreen({ code }: { code: string }) {
   const [seat, setSeat] = useState<Seat | null | undefined>(undefined);
@@ -57,8 +69,11 @@ export function PlayerScreen({ code }: { code: string }) {
   return (
     <div className="player" data-phase={view.phase}>
       <Offline online={online} />
+      {view.phase === "lobby" && <Doodles set="wait" />}
+      {(view.phase === "leaderboard" || view.phase === "ended") && <Doodles set="cheer" />}
       <header className="player-bar">
         <span className="player-name">{view.me.name}</span>
+        <SoundToggle />
         <span className="score-pill" aria-label={`Skor ${view.me.score}`}>
           {view.me.score.toLocaleString("id-ID")}
         </span>
@@ -110,6 +125,7 @@ function JoinForm({ code, onJoined }: { code: string; onJoined: (s: Seat) => voi
     try {
       const seat = await api<Seat>(`/api/rooms/${code}`, { action: "join", name });
       store.set(NAME_KEY, name.trim());
+      sfx("pop");
       onJoined(seat);
     } catch (err) {
       setError((err as Error).message);
@@ -119,6 +135,7 @@ function JoinForm({ code, onJoined }: { code: string; onJoined: (s: Seat) => voi
 
   return (
     <form className="join-form" onSubmit={submit}>
+      <Doodles set="wait" />
       <p className="muted">Ruangan {code}</p>
       <h1 className="display-m">{info.title}</h1>
       {info.phase !== "lobby" && <p className="note">Kuis sudah dimulai. Kamu tetap bisa ikut dari soal berikutnya.</p>}
@@ -176,6 +193,7 @@ function Answering({ view, seat, offset }: { view: PlayerView; seat: Seat; offse
     setPicked(choice); // optimistic: the tap should feel instant
     setError(null);
     vibrate(12);
+    sfx("tap");
     try {
       await api(`/api/rooms/${view.code}`, { action: "answer", ...seat, qIndex: view.qIndex, choice });
     } catch (e) {
@@ -218,23 +236,44 @@ function Verdict({ view }: { view: PlayerView }) {
   const q = view.question!;
   const { choice, lastGain, streak, rank } = view.me;
   const kind = choice === null ? "none" : choice === q.correct ? "correct" : "wrong";
+  const gain = useCountUp(kind === "correct" ? lastGain : 0);
 
   useEffect(() => {
-    if (kind === "correct") vibrate([18, 60, 18]);
-    else if (kind === "wrong") vibrate(70);
-  }, [kind]);
+    if (kind === "correct") {
+      vibrate([18, 60, 18]);
+      sfx("correct");
+      confetti({ count: streak >= 3 ? 150 : 70, y: 0.3 });
+      if (streak >= 3) sfx("streak", 0.4);
+    } else if (kind === "wrong") {
+      vibrate(70);
+      sfx("wrong");
+    } else {
+      sfx("none");
+    }
+  }, [kind, streak]);
 
   return (
     <section className="verdict" data-kind={kind}>
-      <p className="stamp">{kind === "correct" ? "Benar" : kind === "wrong" ? "Belum tepat" : "Tidak menjawab"}</p>
-      {kind === "correct" && <p className="gain">+{lastGain}</p>}
+      <div className="stamp-wrap">
+        {kind === "correct" && (
+          <span className="burst" aria-hidden>
+            {Array.from({ length: 8 }, (_, i) => (
+              <i key={i} style={{ "--a": `${i * 45}deg` } as React.CSSProperties} />
+            ))}
+          </span>
+        )}
+        <p className="stamp">{kind === "correct" ? "Benar!" : kind === "wrong" ? "Belum tepat" : "Tidak menjawab"}</p>
+      </div>
+      {kind === "correct" && <p className="cheer">{CHEERS[view.qIndex % CHEERS.length]}</p>}
+      {kind === "correct" && <p className="gain">+{gain}</p>}
+      {kind === "wrong" && <p className="cheer">{COMFORT[view.qIndex % COMFORT.length]}</p>}
+      {kind === "correct" && <Streak n={streak} big />}
       <p className="verdict-answer">
         Jawaban benar
         <strong>
           {OPTION_LETTERS[q.correct]}. {q.options[q.correct]}
         </strong>
       </p>
-      {streak >= 2 && <p className="streak">{streak} benar beruntun</p>}
       <p className="muted">
         Peringkat {rank} dari {view.playerCount}
       </p>
@@ -244,6 +283,9 @@ function Verdict({ view }: { view: PlayerView }) {
 
 function Standing({ view }: { view: PlayerView }) {
   const { rank, prevRank, score } = view.me;
+  useEffect(() => {
+    if (prevRank && rank < prevRank) sfx("up");
+  }, [rank, prevRank]);
   return (
     <section className="standing">
       <p className="muted">Posisimu sekarang</p>
@@ -262,11 +304,22 @@ function Standing({ view }: { view: PlayerView }) {
 function FinalCard({ view }: { view: PlayerView }) {
   const { rank, score } = view.me;
   const line =
-    rank === 1 ? "Juara sesi ini. Selamat!" : rank <= 3 ? "Masuk tiga besar. Mantap!" : "Terima kasih sudah ikut.";
+    rank === 1 ? "Juara sesi ini. Selamat!" : rank <= 3 ? "Masuk tiga besar. Mantap!" : "Kerja bagus! Terima kasih sudah ikut.";
+
+  useEffect(() => {
+    if (rank <= 3) {
+      sfx("fanfare");
+      confetti({ rain: true, count: 160 });
+    } else {
+      sfx("correct");
+      confetti({ count: 50, y: 0.3 });
+    }
+  }, [rank]);
+
   return (
     <section className="final-card">
       <p className="muted">Hasil akhir</p>
-      <p className="rank-big">{rank}</p>
+      {rank <= 3 ? <Medal place={rank} /> : <p className="rank-big">{rank}</p>}
       <p className="final-line">{line}</p>
       <p>
         {score.toLocaleString("id-ID")} poin, peringkat {rank} dari {view.playerCount}

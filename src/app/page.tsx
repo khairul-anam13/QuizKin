@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { CodeEntry } from "@/components/CodeEntry";
+import { Doodles } from "@/components/Doodles";
 import { Wordmark } from "@/components/Wordmark";
 
 export default function Home() {
   return (
     <main className="page landing">
+      <Doodles set="home" />
       <header className="topbar">
         <Wordmark />
       </header>

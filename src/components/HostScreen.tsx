@@ -1,12 +1,24 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { renderSVG } from "uqr";
-import { api, hostKeyFor, store, useRoomStream } from "@/lib/client";
-import type { HostView, PlayerRow } from "@/lib/types";
-import { Connecting, Letter, Movement, Notice, Offline, TimerBar } from "./GameParts";
-import { Check } from "./Icons";
+import { api, hostKeyFor, store, useRoomStream, useSecondsLeft } from "@/lib/client";
+import { confetti } from "@/lib/confetti";
+import { music, sfx, type TrackName, useMusic } from "@/lib/sound";
+import type { HostView, Phase, PlayerRow } from "@/lib/types";
+import { Doodles } from "./Doodles";
+import { Connecting, Letter, Movement, Notice, Offline, SoundToggle, Streak, TimerBar } from "./GameParts";
+import { Check, Crown } from "./Icons";
+
+// The podium plays its own fanfare first and starts the party loop itself.
+const TRACK_FOR: Record<Phase, TrackName | null> = {
+  lobby: "lobby",
+  question: "think",
+  reveal: null,
+  leaderboard: "lobby",
+  ended: null,
+};
 
 export function HostScreen({ code }: { code: string }) {
   const [hostKey, setHostKey] = useState<string | null | undefined>(undefined);
@@ -16,6 +28,7 @@ export function HostScreen({ code }: { code: string }) {
   const { view, gone, online, offset } = useRoomStream<HostView>(code, query);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  useMusic(view && !gone ? TRACK_FOR[view.phase] : null);
 
   const act = async (action: string, extra: Record<string, unknown> = {}) => {
     setBusy(true);
@@ -51,6 +64,8 @@ export function HostScreen({ code }: { code: string }) {
   return (
     <div className="host" data-phase={view.phase}>
       <Offline online={online} />
+      {view.phase === "lobby" && <Doodles set="lobby" />}
+      {(view.phase === "leaderboard" || view.phase === "ended") && <Doodles set="cheer" />}
       <header className="host-bar">
         <span className="host-code" aria-label={`Kode ruangan ${code}`}>
           {code}
@@ -61,6 +76,7 @@ export function HostScreen({ code }: { code: string }) {
           </span>
         )}
         <span className="host-count">{view.players.length} peserta</span>
+        <SoundToggle />
         {playing && <EndButton onEnd={() => act("end")} disabled={busy} />}
       </header>
 
@@ -145,6 +161,12 @@ function EndButton({ onEnd, disabled }: { onEnd: () => void; disabled: boolean }
 function Lobby({ view, onKick }: { view: HostView; onKick: (pid: string) => void }) {
   const joinUrl = `${location.origin}/${view.code}`;
   const qr = useMemo(() => renderSVG(joinUrl, { border: 1 }), [joinUrl]);
+  const count = view.players.length;
+  const seen = useRef(count);
+  useEffect(() => {
+    if (count > seen.current) sfx("pop");
+    seen.current = count;
+  }, [count]);
 
   return (
     <div className="lobby">
@@ -166,7 +188,7 @@ function Lobby({ view, onKick }: { view: HostView; onKick: (pid: string) => void
         ) : (
           <ul className="chips">
             {view.players.map((p) => (
-              <li key={p.id} className="chip" data-online={p.online}>
+              <li key={p.id} className="chip" data-online={p.online} data-tint={tint(p.id)}>
                 <span>{p.name}</span>
                 <button className="chip-x" aria-label={`Keluarkan ${p.name}`} onClick={() => onKick(p.id)}>
                   <svg viewBox="0 0 24 24" aria-hidden>
@@ -184,6 +206,10 @@ function Lobby({ view, onKick }: { view: HostView; onKick: (pid: string) => void
 
 function QuestionStage({ view, offset }: { view: HostView; offset: number }) {
   const q = view.question!;
+  const left = useSecondsLeft(view.endsAt, offset, true);
+  useEffect(() => {
+    if (left > 0 && left <= 5) sfx("tick");
+  }, [left]);
   return (
     <div className="stage">
       <TimerBar startedAt={view.startedAt} endsAt={view.endsAt} offset={offset} running />
@@ -208,6 +234,11 @@ function RevealStage({ view }: { view: HostView }) {
   const max = Math.max(1, ...view.distribution);
   const total = view.distribution.reduce((a, b) => a + b, 0);
   const right = view.distribution[q.correct] ?? 0;
+
+  useEffect(() => {
+    sfx("reveal");
+    if (right > 0) confetti({ count: 50 + Math.min(right, 30) * 3, y: 0.45 });
+  }, [right]);
 
   return (
     <div className="stage">
@@ -242,6 +273,7 @@ function RevealStage({ view }: { view: HostView }) {
 }
 
 function Leaderboard({ players }: { players: PlayerRow[] }) {
+  useEffect(() => sfx("whoosh"), []);
   return (
     <div className="board">
       <h1 className="display-m">Peringkat sementara</h1>
@@ -251,7 +283,7 @@ function Leaderboard({ players }: { players: PlayerRow[] }) {
             <span className="board-rank">{p.rank}</span>
             <span className="board-name">
               {p.name}
-              {p.streak >= 3 && <span className="streak">{p.streak} benar beruntun</span>}
+              {p.streak >= 3 && <Streak n={p.streak} />}
             </span>
             <Movement prev={p.prevRank} now={p.rank} />
             <span className="board-score">
@@ -274,6 +306,27 @@ function Final({ view }: { view: HostView }) {
     { p: third, place: 3 },
   ];
 
+  // Timed to the podium's staggered rise in the stylesheet: 3rd, then 2nd, then 1st.
+  // Keyed on the podium size, not the rows: rows are new objects on every update.
+  const placed = Math.min(view.players.length, 3);
+  useEffect(() => {
+    if (placed === 0) return;
+    const at = (ms: number, fn: () => void) => setTimeout(fn, ms);
+    const timers = [
+      placed >= 3 && at(200, () => sfx("pop")),
+      placed >= 2 && at(900, () => sfx("pop")),
+      at(1600, () => {
+        sfx("fanfare");
+        confetti({ rain: true, count: 220 });
+      }),
+      at(3400, () => music("party")),
+    ];
+    return () => {
+      timers.forEach((t) => t && clearTimeout(t));
+      music(null);
+    };
+  }, [placed]);
+
   return (
     <div className="final">
       <h1 className="display-m">{view.title}</h1>
@@ -284,6 +337,7 @@ function Final({ view }: { view: HostView }) {
           {steps.map(({ p, place }) =>
             p ? (
               <li key={place} className="podium-step" data-place={place}>
+                {place === 1 && <Crown />}
                 <span className="podium-name">{p.name}</span>
                 <span className="podium-score">{p.score.toLocaleString("id-ID")}</span>
                 <span className="podium-block">{place}</span>
@@ -307,6 +361,13 @@ function Final({ view }: { view: HostView }) {
       )}
     </div>
   );
+}
+
+/** A stable highlighter colour per player, so each name chip keeps its colour. */
+function tint(id: string) {
+  let h = 0;
+  for (const ch of id) h = (h * 31 + ch.charCodeAt(0)) | 0;
+  return Math.abs(h) % 4;
 }
 
 function downloadCsv(view: HostView) {

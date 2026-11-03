@@ -27,6 +27,8 @@ Agar murid di jaringan Wi-Fi yang sama bisa masuk, jalankan dengan `pnpm start -
 
 Skor: jawaban benar bernilai 500–1000 poin, makin cepat makin besar. Soal ditutup otomatis saat waktu habis atau semua peserta online sudah menjawab.
 
+Suara dan efek: layar guru memutar musik latar (lobby, saat soal, dan podium), bunyi detik di 5 detik terakhir, dan konfeti saat jawaban dibuka dan di podium. HP murid hanya memutar efek pendek (benar, salah, beruntun, medali) supaya kelas tidak riuh oleh 30 musik sekaligus. Semua suara dibuat langsung dengan Web Audio (`src/lib/sound.ts`), jadi tidak ada file audio yang perlu diunduh. Tombol speaker di pojok atas mematikan suara, dan pilihan itu diingat browser.
+
 ## Arsitektur
 
 - Next.js App Router + TypeScript, tanpa library UI. Dependensi tambahan: `uqr` (kode QR) dan `@upstash/redis`.
