@@ -54,18 +54,26 @@ export function useRoomStream<V extends HostView | PlayerView>(code: string, que
 
   useEffect(() => {
     if (query === null) return;
-    const es = new EventSource(`/api/rooms/${code}/events?${query}`);
-    es.onopen = () => setState((s) => ({ ...s, online: true }));
-    es.onerror = () => setState((s) => ({ ...s, online: false }));
-    es.onmessage = (msg) => {
-      const event = JSON.parse(msg.data) as RoomEvent;
-      if (event.type === "gone") {
-        es.close();
-        setState((s) => ({ ...s, gone: event.reason }));
-        return;
-      }
-      setState({ view: event.view as V, gone: null, online: true, offset: event.view.now - Date.now() });
+    let es: EventSource;
+    const open = () => {
+      es = new EventSource(`/api/rooms/${code}/events?${query}`);
+      es.onopen = () => setState((s) => ({ ...s, online: true }));
+      es.onerror = () => setState((s) => ({ ...s, online: false }));
+      es.onmessage = (msg) => {
+        const event = JSON.parse(msg.data) as RoomEvent;
+        if (event.type === "renew") {
+          // Planned hand-over to a fresh stream; swap quietly instead of flashing "offline".
+          es.close();
+          open();
+        } else if (event.type === "gone") {
+          es.close();
+          setState((s) => ({ ...s, gone: event.reason }));
+        } else {
+          setState({ view: event.view as V, gone: null, online: true, offset: event.view.now - Date.now() });
+        }
+      };
     };
+    open();
     return () => es.close();
   }, [code, query]);
 

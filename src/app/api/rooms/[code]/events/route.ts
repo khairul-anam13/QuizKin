@@ -1,21 +1,25 @@
-import { getRoom, isHost, playerFor, subscribe } from "@/lib/server/rooms";
+import { canWatch, watch } from "@/lib/server/rooms";
 import type { RoomEvent } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
+// Serverless functions have a time limit, so each stream ends itself before it and
+// tells the client to reconnect right away.
+export const maxDuration = 300;
+const STREAM_MS = 240_000;
 
 type Ctx = { params: Promise<{ code: string }> };
 
+const frame = (e: RoomEvent) => `data: ${JSON.stringify(e)}\n\n`;
+
 export async function GET(req: Request, { params }: Ctx) {
-  const room = getRoom((await params).code);
+  const { code } = await params;
   const url = new URL(req.url);
   const host = url.searchParams.get("host");
-  const player = room && playerFor(room, url.searchParams.get("pid"), url.searchParams.get("token"));
+  const pid = url.searchParams.get("pid");
+  const status = await canWatch(code, { host, pid, token: url.searchParams.get("token") });
 
   // A dead room or unknown seat gets a single "gone" event so the client stops retrying.
-  if (!room || (host ? !isHost(room, host) : !player)) {
-    const reason = room ? "kicked" : "closed";
-    return sse(`data: ${JSON.stringify({ type: "gone", reason } satisfies RoomEvent)}\n\n`);
-  }
+  if (status !== "ok") return sse(frame({ type: "gone", reason: status }));
 
   const encoder = new TextEncoder();
   let cleanup = () => {};
@@ -29,25 +33,30 @@ export async function GET(req: Request, { params }: Ctx) {
           cleanup();
         }
       };
-      const unsubscribe = subscribe(
-        room,
-        host
-          ? { role: "host", send: (e) => write(`data: ${JSON.stringify(e)}\n\n`) }
-          : { role: "player", pid: player!.id, send: (e) => write(`data: ${JSON.stringify(e)}\n\n`) },
-      );
-      // Comment lines keep proxies from closing an idle connection.
-      const ping = setInterval(() => write(": ping\n\n"), 20_000);
-      cleanup = () => {
-        clearInterval(ping);
-        unsubscribe();
-        cleanup = () => {};
-      };
-      req.signal.addEventListener("abort", () => {
+      const end = () => {
         cleanup();
         try {
           controller.close();
         } catch {}
-      });
+      };
+      const send = (e: RoomEvent) => {
+        write(frame(e));
+        if (e.type === "gone") end();
+      };
+      const unwatch = watch(code, host ? { role: "host", send } : { role: "player", pid: pid!, send });
+      // Comment lines keep proxies from closing an idle connection.
+      const ping = setInterval(() => write(": ping\n\n"), 20_000);
+      const renew = setTimeout(() => {
+        write(frame({ type: "renew" }));
+        end();
+      }, STREAM_MS);
+      cleanup = () => {
+        clearInterval(ping);
+        clearTimeout(renew);
+        unwatch();
+        cleanup = () => {};
+      };
+      req.signal.addEventListener("abort", end);
     },
     cancel() {
       cleanup();

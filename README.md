@@ -29,10 +29,23 @@ Skor: jawaban benar bernilai 500–1000 poin, makin cepat makin besar. Soal ditu
 
 ## Arsitektur
 
-- Next.js App Router + TypeScript, tanpa library UI. Satu-satunya dependensi tambahan: `uqr` (kode QR).
-- State ruangan disimpan di memori proses Node (`src/lib/server/rooms.ts`); server adalah sumber kebenaran untuk waktu dan skor.
-- Realtime memakai Server-Sent Events (`/api/rooms/{kode}/events`); aksi dikirim lewat `POST /api/rooms/{kode}`.
+- Next.js App Router + TypeScript, tanpa library UI. Dependensi tambahan: `uqr` (kode QR) dan `@upstash/redis`.
+- State ruangan disimpan di Redis (`src/lib/server/rooms.ts`), jadi semua instance serverless melihat permainan yang sama. Server adalah sumber kebenaran untuk waktu dan skor.
+  - Nama peserta, jawaban, dan penutupan soal memakai perintah atomik (`HSETNX`, `SET NX`), sehingga jawaban serentak tidak saling menimpa dan skor tidak terhitung dua kali.
+  - Setiap perubahan menaikkan `qk:{kode}:ver`.
+- Realtime memakai Server-Sent Events (`/api/rooms/{kode}/events`). Stream-stream untuk ruangan yang sama di satu instance berbagi satu pengamat yang mengecek `ver` setiap detik dan memuat ulang state hanya saat berubah. Stream diakhiri sendiri tiap 4 menit (batas durasi function) dan browser langsung menyambung ulang tanpa terlihat.
+- Soal ditutup oleh siapa pun yang sedang mengamati begitu waktunya habis, karena serverless tidak punya timer yang bisa diandalkan.
 - Guru dikenali lewat `hostKey` acak, murid lewat `pid` + `token`, keduanya disimpan di `localStorage` sehingga refresh halaman tidak memutus sesi.
-- Ruangan yang tidak aktif selama 4 jam dihapus otomatis.
+- Semua key ruangan kedaluwarsa otomatis setelah 12 jam.
 
-**Catatan deploy:** karena state ada di memori, aplikasi harus berjalan sebagai **satu proses Node yang hidup terus** (VPS, Railway, Fly.io, Render, Docker, dsb). Platform serverless seperti Vercel tidak cocok tanpa mengganti penyimpanan ke Redis atau sejenisnya.
+Tanpa variabel Redis, aplikasi memakai memori proses. Itu cukup untuk `pnpm dev` atau satu `pnpm start` di laptop guru, tapi tidak untuk serverless.
+
+## Deploy ke Vercel
+
+1. Impor repo ini di Vercel (framework: Next.js, tanpa pengaturan tambahan).
+2. Di project Vercel, buka **Storage** (atau Marketplace), pilih **Upstash for Redis**, buat database (paket gratis cukup), lalu hubungkan ke project. Vercel otomatis menambahkan `KV_REST_API_URL` dan `KV_REST_API_TOKEN`.
+   Kalau membuat database langsung di upstash.com, isi `UPSTASH_REDIS_REST_URL` dan `UPSTASH_REDIS_REST_TOKEN` di Environment Variables.
+3. Pilih region database **Singapore (ap-southeast-1)**. Function Vercel sudah diarahkan ke Singapura (`sin1`) lewat `vercel.json`, jadi keduanya dekat dengan murid di Indonesia dan dekat satu sama lain.
+4. Deploy ulang setelah variabel ditambahkan.
+
+Netlify juga bisa memakai Redis yang sama, tetapi Netlify menahan stream SSE sampai selesai, sehingga update realtime tidak sampai tepat waktu. Gunakan Vercel atau server Node biasa.

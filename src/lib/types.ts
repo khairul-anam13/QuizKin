@@ -67,4 +67,5 @@ export type PlayerView = BaseView & {
 
 export type RoomEvent =
   | { type: "state"; view: HostView | PlayerView }
-  | { type: "gone"; reason: "kicked" | "closed" };
+  | { type: "gone"; reason: "kicked" | "closed" }
+  | { type: "renew" }; // the server is about to end this stream; reconnect now
