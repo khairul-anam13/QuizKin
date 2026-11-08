@@ -103,6 +103,91 @@ export function parseBulk(text: string): Question[] {
     });
 }
 
+// A real class quiz, kept permanently in the app (not only in a browser's localStorage)
+// so it survives cleared browser data or a fresh deploy. Seeded once into every new
+// browser's quiz list on first visit; see Studio.tsx.
+export const NASYWA_QUIZ: Quiz = {
+  title: "Kuiz Nasywa",
+  questions: [
+    {
+      text: "Indonesia terdiri atas banyak pulau dan ... provinsi.",
+      options: ["34", "38", "40"],
+      correct: 1,
+      time: 20,
+    },
+    {
+      text: "Pernyataan yang benar tentang provinsi dan kabupaten/kota adalah ...",
+      options: [
+        "Provinsi lebih luas dan terdiri atas beberapa kabupaten dan kota",
+        "Kabupaten/kota lebih luas daripada provinsi",
+        "Provinsi dan kabupaten/kota luasnya sama",
+      ],
+      correct: 0,
+      time: 20,
+    },
+    {
+      text: "Bentang alam adalah ...",
+      options: [
+        "Kebiasaan dan tarian suatu daerah",
+        "Kekayaan alam yang bisa dimanfaatkan manusia",
+        "Bentuk permukaan bumi yang terjadi secara alami",
+      ],
+      correct: 2,
+      time: 20,
+    },
+    {
+      text: "Daerah gunung udaranya sejuk dan tanahnya subur. Sumber daya alam (SDA) yang bisa diperoleh dari gunung adalah ...",
+      options: ["Garam dan rumput laut", "Air bersih, sayur, teh, dan kopi", "Ikan laut dan mutiara"],
+      correct: 1,
+      time: 20,
+    },
+    {
+      text: "Air sungai mengalir dari hulu (tinggi) menuju ...",
+      options: ["Hilir, lalu bermuara ke laut", "Puncak gunung", "Dataran yang lebih tinggi lagi"],
+      correct: 0,
+      time: 20,
+    },
+    {
+      text: "Mengapa banyak penduduk di daerah pantai bekerja sebagai nelayan?",
+      options: ["Karena tanahnya subur dan udaranya sejuk", "Karena di sana banyak gunung", "Karena ada laut tempat mencari ikan"],
+      correct: 2,
+      time: 20,
+    },
+    {
+      text: "Kartu bergambar Gunung Bromo, apel, garam, dan Reog Ponorogo berasal dari ...",
+      options: ["Bali", "Jawa Timur", "Papua Pegunungan"],
+      correct: 1,
+      time: 20,
+    },
+    {
+      text: "Daerah yang memiliki savana, Pulau Komodo, alat musik Sasando, dan tenun ikat adalah ...",
+      options: ["Nusa Tenggara Timur", "Kalimantan Timur", "Maluku"],
+      correct: 0,
+      time: 20,
+    },
+    {
+      text: "Manakah perbandingan budaya yang tepat antara Sulawesi Selatan dan Papua Pegunungan?",
+      options: [
+        "Keduanya sama-sama membangun rumah Honai",
+        "Sulawesi Selatan terkenal rumah Honai, Papua Pegunungan terkenal perahu pinisi",
+        "Sulawesi Selatan terkenal perahu pinisi, Papua Pegunungan terkenal rumah Honai",
+      ],
+      correct: 2,
+      time: 20,
+    },
+    {
+      text: "Cara yang tepat untuk ikut menjaga bentang alam dan budaya daerah adalah ...",
+      options: [
+        "Tidak membuang sampah ke sungai dan pantai, serta belajar tari dan lagu daerah",
+        "Membuang sampah ke sungai agar cepat hilang",
+        "Mengejek budaya teman yang berbeda dari budayaku",
+      ],
+      correct: 0,
+      time: 20,
+    },
+  ],
+};
+
 export const SAMPLE_QUIZ: Quiz = {
   title: "Pengetahuan Umum Nusantara",
   questions: [

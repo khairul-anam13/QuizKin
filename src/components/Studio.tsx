@@ -3,13 +3,15 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { api, hostKeyFor, store } from "@/lib/client";
-import { emptyQuestion, LIMITS, OPTION_LETTERS, parseBulk, quizProblem, SAMPLE_QUIZ, TIME_CHOICES } from "@/lib/quiz";
+import { emptyQuestion, LIMITS, NASYWA_QUIZ, OPTION_LETTERS, parseBulk, quizProblem, SAMPLE_QUIZ, TIME_CHOICES } from "@/lib/quiz";
 import { startRankMe } from "@/lib/rankme";
 import type { Question, Quiz } from "@/lib/types";
 import { Check } from "./Icons";
 
 type Saved = { id: string; updatedAt: number; quiz: Quiz };
 const KEY = "qk:quizzes";
+const NASYWA_ID = "kuiz-nasywa";
+const NASYWA_SEEDED_KEY = "qk:seeded:nasywa";
 const newId = () => Math.random().toString(36).slice(2, 10);
 
 export function Studio() {
@@ -20,7 +22,19 @@ export function Studio() {
   const [error, setError] = useState<string | null>(null);
   const [undo, setUndo] = useState<{ item: Saved; index: number } | null>(null);
 
-  useEffect(() => setList(store.get<Saved[]>(KEY) ?? []), []);
+  useEffect(() => {
+    const saved = store.get<Saved[]>(KEY) ?? [];
+    // Kuiz Nasywa is a real class quiz we want to survive cleared browser data, so it's
+    // added once per browser on first visit — but only once, so deleting it later sticks.
+    if (!store.get<boolean>(NASYWA_SEEDED_KEY)) {
+      store.set(NASYWA_SEEDED_KEY, true);
+      saved.unshift({ id: NASYWA_ID, updatedAt: Date.now(), quiz: structuredClone(NASYWA_QUIZ) });
+      // Persisted right away (not left to the effect below) so React's dev-mode double
+      // effect invoke reads this same seeded list back instead of the stale empty one.
+      store.set(KEY, saved);
+    }
+    setList(saved);
+  }, []);
   useEffect(() => {
     if (list) store.set(KEY, list);
   }, [list]);
