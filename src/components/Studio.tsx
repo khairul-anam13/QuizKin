@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { api, hostKeyFor, store } from "@/lib/client";
 import { emptyQuestion, LIMITS, OPTION_LETTERS, parseBulk, quizProblem, SAMPLE_QUIZ, TIME_CHOICES } from "@/lib/quiz";
+import { startRankMe } from "@/lib/rankme";
 import type { Question, Quiz } from "@/lib/types";
 import { Check } from "./Icons";
 
@@ -60,6 +61,11 @@ export function Studio() {
     }
   };
 
+  const playRankMe = (quiz: Quiz) => {
+    startRankMe(quiz);
+    router.push("/rankme");
+  };
+
   const open = list.find((s) => s.id === openId);
 
   return (
@@ -74,6 +80,7 @@ export function Studio() {
           onBack={() => setOpenId(null)}
           onDelete={() => remove(open.id)}
           onLaunch={() => launch(open.quiz)}
+          onRankMe={() => playRankMe(open.quiz)}
         />
       ) : (
         <section className="studio-list">
@@ -109,6 +116,9 @@ export function Studio() {
                       onClick={() => launch(s.quiz)}
                     >
                       Mainkan
+                    </button>
+                    <button className="btn btn-ghost btn-sm" disabled={!!problem} onClick={() => playRankMe(s.quiz)}>
+                      RankMe
                     </button>
                   </li>
                 );
@@ -150,6 +160,7 @@ function QuizEditor(props: {
   onBack: () => void;
   onDelete: () => void;
   onLaunch: () => void;
+  onRankMe: () => void;
 }) {
   const { quiz, onChange } = props;
   const bulkRef = useRef<HTMLDialogElement>(null);
@@ -230,9 +241,14 @@ function QuizEditor(props: {
         <p className={problem || props.error ? "dock-note error" : "dock-note"} role="status">
           {props.error ?? problem ?? `${quiz.questions.length} soal siap dimainkan.`}
         </p>
-        <button className="btn btn-primary btn-block" disabled={!!problem || props.launching} onClick={props.onLaunch}>
-          {props.launching ? "Membuka ruangan…" : "Mulai sesi"}
-        </button>
+        <div className="dock-row">
+          <button className="btn btn-ghost" disabled={!!problem} onClick={props.onRankMe}>
+            Mode RankMe
+          </button>
+          <button className="btn btn-primary" disabled={!!problem || props.launching} onClick={props.onLaunch}>
+            {props.launching ? "Membuka ruangan…" : "Mulai sesi"}
+          </button>
+        </div>
       </div>
     </section>
   );

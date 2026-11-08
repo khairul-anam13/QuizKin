@@ -24,8 +24,20 @@ Agar murid di jaringan Wi-Fi yang sama bisa masuk, jalankan dengan `pnpm start -
 - `/buat` — guru menyusun kuis (tersimpan di `localStorage`), bisa tempel banyak soal sekaligus, lalu **Mulai sesi**.
 - `/host/{kode}` — layar guru: lobby + QR, soal dengan timer, distribusi jawaban, peringkat, podium, unduh nilai CSV.
 - `/{kode}` — layar murid: isi nama, jawab, lihat benar/salah, poin dan peringkat.
+- `/rankme` — **Mode RankMe**: murid bergantian pakai satu perangkat (tidak perlu HP sendiri). Dibuka lewat tombol "Mode RankMe" di `/buat`.
 
 Skor: jawaban benar bernilai 500–1000 poin, makin cepat makin besar. Soal ditutup otomatis saat waktu habis atau semua peserta online sudah menjawab.
+
+### Mode RankMe
+
+Untuk kelas atau sekolah yang tidak mengizinkan murid membawa HP, Mode RankMe menjalankan kuis yang sama secara bergantian di satu perangkat (laptop atau tablet guru):
+
+1. Guru menyerahkan perangkat ke murid pertama, yang mengetik namanya sendiri.
+2. Murid menjawab semua soal sendirian, dengan timer, skor, dan efek yang sama seperti mode kelas.
+3. Setelah selesai, perangkat kembali ke guru untuk diserahkan ke murid berikutnya ("Giliran berikutnya").
+4. Setelah semua murid main, guru menekan "Akhiri sesi" untuk melihat podium, peringkat lengkap, dan mengunduh nilai (CSV).
+
+Mode ini berjalan seluruhnya di browser (`src/lib/rankme.ts`, `src/components/RankMeScreen.tsx`) — tidak memanggil server atau Redis sama sekali, karena hanya satu perangkat yang terlibat, jadi tidak ada yang perlu disinkronkan. Progres tersimpan di `localStorage` sehingga refresh halaman tidak kehilangan murid yang sudah main sebelumnya (giliran yang sedang berjalan tetap hilang kalau di-refresh).
 
 Suara dan efek: layar guru memutar musik latar (lobby, saat soal, dan podium), bunyi detik di 5 detik terakhir, dan konfeti saat jawaban dibuka dan di podium. HP murid hanya memutar efek pendek (benar, salah, beruntun, medali) supaya kelas tidak riuh oleh 30 musik sekaligus. Semua suara dibuat langsung dengan Web Audio (`src/lib/sound.ts`), jadi tidak ada file audio yang perlu diunduh. Tombol speaker di pojok atas mematikan suara, dan pilihan itu diingat browser.
 
